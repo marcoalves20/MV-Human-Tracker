@@ -22,7 +22,7 @@ class PoseDetector:
     def get_landmarks(self):
         return list(mp.solutions.pose.PoseLandmark)
 
-    def run_inference(self, img):
+    def predict(self, img):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.pose.process(imgRGB)
         if self.results.pose_landmarks:
@@ -32,7 +32,8 @@ class PoseDetector:
                 cx, cy = lm.x * w, lm.y * h
                 keypoints.append([id, cx, cy])
             return np.asarray(keypoints)
-        return np.asarray(np.nan*np.zeros(33,2))
+        else:
+            return np.asarray(np.zeros((33,2)))
 
     def findPose(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

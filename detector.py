@@ -1,6 +1,7 @@
 import yolov5
 import cv2
 import torch
+import numpy as np
 
 def filter_predictions(results):
   predictions = results.pred[0]
@@ -14,7 +15,8 @@ def filter_predictions(results):
 
 def draw_predictions(frame, boxes):
   boxes = boxes.numpy().astype(int)
-
+  if np.ndim(boxes) < 2:
+    boxes = np.reshape(boxes, [1,-1])
   for i in range(boxes.shape[0]):
     cv2.rectangle(frame, (boxes[i,0], boxes[i,1]), (boxes[i,2], boxes[i,3]), (0, 255, 0), 2)
   return frame
@@ -30,7 +32,7 @@ model.max_det = 30  # maximum number of detections per image
 cap = cv2.VideoCapture('videos/test.mp4')
 while(cap.isOpened()):
   ret, frame = cap.read()
-  # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+  frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
   results = model(frame)
   prediction, boxes = filter_predictions(results)
   frame = draw_predictions(frame, boxes)
@@ -38,6 +40,7 @@ while(cap.isOpened()):
 
   if cv2.waitKey(1) & 0xFF == ord('q'):
     break
+
 
 
 

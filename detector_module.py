@@ -1,40 +1,47 @@
-from yolov5 import YOLOv5
+import yolov5
 import cv2
 import torch
 import numpy as np
 import time
 
 class YoloDetector:
-    def __init__(self, weights_path, device='cpu', classes=[0], min_detection_confidence=0.5, iou_threshold=1,
-                 multi_label=False, max_det=False):
-        self.model = YOLOv5(weights_path, device=device)
+    def __init__(self, weights_path='yolov5s.pt', classes=[0], conf=0.25, iou_threshold=0.45,
+                 multi_label=False, max_det=30):
+
+
+        self.model = yolov5.load(weights_path)
         self.model.classes = classes
-        self.model.conf = min_detection_confidence  # NMS confidence threshold
+        self.model.conf = conf  # NMS confidence threshold
         self.model.iou = iou_threshold  # NMS IoU threshold
         self.model.agnostic = False  # NMS class-agnostic
         self.model.multi_label = multi_label  # NMS multiple labels per box
         self.model.max_det = max_det  # maximum number of detections per image
 
-    def run_inference(self, img):
-        results = self.model.predict(img)
-        bboxes = []
-        if results:
-            for result in results.pred:
-                bboxes.append(result.cpu().numpy()[:,:4])
-            return bboxes
-        else:
-            return []
+    def predict(self, img):
+        results = self.model(img)
+        return results.pred[0].cpu().numpy()[:, :4]
+
+
+    def get_bb_img(self, img, bb, expand_bb=False, margin=5):
+        if expand_bb:
+            bb[0] -= margin
+            bb[1] -= margin
+            bb[2] += margin
+            bb[2] += margin
+        bb=np.squeeze(bb.astype(int))
+        return bb, img[bb[1]:bb[3], bb[0]:bb[2],:]
 
 
 
 def main():
     device = "cuda:0"  # or "cpu"
-    cap = cv2.VideoCapture('videos/wembley/cam01.mp4')  # make VideoCapture(0) for webcam
+    cap = cv2.VideoCapture('videos/test.mp4')  # make VideoCapture(0) for webcam
     pTime = 0
-    detector = YoloDetector('models/yolov5s.pt', device)
+    detector = YoloDetector()
     while True:
         success, img = cap.read()
-        bboxes = detector.run_inference(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        bboxes = detector.predict(img)
 
         cTime = time.time()
         fps = 1 / (cTime - pTime)
