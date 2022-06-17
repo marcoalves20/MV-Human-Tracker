@@ -2,6 +2,8 @@ import cv2
 import mediapipe as mp
 import time
 
+import numpy as np
+
 
 class PoseDetector:
     def __init__(self, static_image_mode=True, model_complexity=1, smooth_landmarks=False, enable_segmentation=False,
@@ -15,6 +17,22 @@ class PoseDetector:
         self.pose = self.mpPose.Pose(static_image_mode=static_image_mode, model_complexity=model_complexity,
                                      smooth_landmarks=smooth_landmarks, enable_segmentation=enable_segmentation,
                                      min_detection_confidence=min_detection_confidence)
+
+    @property
+    def get_landmarks(self):
+        return list(mp.solutions.pose.PoseLandmark)
+
+    def run_inference(self, img):
+        imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        self.results = self.pose.process(imgRGB)
+        if self.results.pose_landmarks:
+            h, w, c = img.shape
+            keypoints = []
+            for id, lm in enumerate(self.results.pose_landmarks.landmark):
+                cx, cy = lm.x * w, lm.y * h
+                keypoints.append([id, cx, cy])
+            return np.asarray(keypoints)
+        return np.asarray(np.nan*np.zeros(33,2))
 
     def findPose(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -37,13 +55,14 @@ class PoseDetector:
 
 
 def main():
-    cap = cv2.VideoCapture('videos/wembley/cam01.mp4')  # make VideoCapture(0) for webcam
+    cap = cv2.VideoCapture('videos/test.mp4')  # make VideoCapture(0) for webcam
     pTime = 0
     detector = PoseDetector()
     while True:
         success, img = cap.read()
         img = detector.findPose(img)
         lmList = detector.getPosition(img)
+        keypoints = detector.run_inference(img)
         print(lmList)
 
         cTime = time.time()

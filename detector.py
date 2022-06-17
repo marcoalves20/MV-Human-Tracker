@@ -27,7 +27,7 @@ model.agnostic = False  # NMS class-agnostic
 model.multi_label = False  # NMS multiple labels per box
 model.max_det = 30  # maximum number of detections per image
 
-cap = cv2.VideoCapture('videos/cam01.mp4')
+cap = cv2.VideoCapture('videos/test.mp4')
 while(cap.isOpened()):
   ret, frame = cap.read()
   # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
