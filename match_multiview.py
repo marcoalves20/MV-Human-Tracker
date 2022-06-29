@@ -38,18 +38,6 @@ class Detection2D(Detection):
             self=self)
 
 
-class Detection3D(Detection):
-
-    def __init__(self, index=None, position=None, confidence=0.5,
-                 datetime=None, clique=None, id=None):
-        super(Detection3D, self).__init__(index, position, confidence, datetime, id)
-        self.clique = clique
-        self.node = None
-
-    def __str__(self):
-        return """{self.__class__.__name__}(index={self.index}, position={self.position}, confidence={self.confidence}, datetime={self.datetime})""".format(
-            self=self)
-
 
 def find_candidate_matches(detections, views, calibration, max_dist=10, n_candidates=2,
                            verbose=0):
