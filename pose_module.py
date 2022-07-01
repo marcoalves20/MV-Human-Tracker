@@ -21,26 +21,22 @@ class PoseDetector:
     def get_landmarks(self):
         return list(mp.solutions.pose.PoseLandmark)
 
-    def predict(self, img):
-        # imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        self.results = self.pose.process(img)
-        if self.results.pose_landmarks:
-            h, w, c = img.shape
-            keypoints = []
-            for id, lm in enumerate(self.results.pose_landmarks.landmark):
-                cx, cy = lm.x * w, lm.y * h
-                keypoints.append([cx, cy])
-            return np.asarray(keypoints)
-        else:
-            return np.asarray(np.zeros((33,2)))
-
-    def findPose(self, img, draw=True):
+    def predict(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.pose.process(imgRGB)
         if self.results.pose_landmarks:
             if draw:
                 self.mpDraw.draw_landmarks(img, self.results.pose_landmarks, self.mpPose.POSE_CONNECTIONS)
-        return img
+
+            h, w, c = img.shape
+            keypoints = []
+            for id, lm in enumerate(self.results.pose_landmarks.landmark):
+                cx, cy = lm.x * w, lm.y * h
+                keypoints.append([cx, cy, lm.visibility])
+            return np.asarray(keypoints)
+        else:
+            return np.asarray(np.zeros((33, 3)))
+
 
     def getPosition(self, img, draw=True):
         lmList = []
@@ -60,14 +56,15 @@ def main():
     detector = PoseDetector()
     while True:
         success, img = cap.read()
-        img = detector.findPose(img)
         # lmList = detector.getPosition(img)
         keypoints = detector.predict(img)
+        labels = [x.name for x in detector.get_landmarks]
         # print(lmList)
 
         cTime = time.time()
         fps = 1 / (cTime - pTime)
         pTime = cTime
+
 
         cv2.putText(img, str(int(fps)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
         cv2.imshow("Image", img)

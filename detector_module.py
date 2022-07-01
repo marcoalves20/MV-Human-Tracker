@@ -28,22 +28,24 @@ class HumanDetector:
             bb[0] -= margin
             bb[1] -= margin
             bb[2] += margin
-            bb[2] += margin
+            bb[3] += margin
         bb=np.squeeze(bb.astype(int))
-        return bb, img[bb[1]:bb[3], bb[0]:bb[2],:]
+        return img[bb[1]:bb[3], bb[0]:bb[2],:]
 
 
 
 def main():
     device = "cuda:0"  # or "cpu"
-    cap = cv2.VideoCapture('videos/wembley/cam02.mp4')  # make VideoCapture(0) for webcam
+    cap = cv2.VideoCapture('videos/wembley/cam01.mp4')  # make VideoCapture(0) for webcam
     pTime = 0
-    detector = HumanDetector(img_size=1280)
+    detector = HumanDetector(img_size=1920)
     while True:
         success, img = cap.read()
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         bboxes = detector.predict(img)
-        bboxes = bboxes.astype(int)
+        #bboxes = bboxes.astype(int)
+        scores = bboxes[:, 4]
+        bboxes = bboxes[:, :4].astype(int)
         # np.save('detections_cam05.npy', bboxes)
         cTime = time.time()
         fps = 1 / (cTime - pTime)
@@ -51,6 +53,10 @@ def main():
 
         for i in range(bboxes.shape[0]):
             cv2.rectangle(img, (bboxes[i,0], bboxes[i,1]), (bboxes[i,2], bboxes[i,3]),(0,255,0),3)
+            cv2.putText(img, str(i), (bboxes[i,0] - 10, bboxes[i,1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255),
+                        2, cv2.LINE_AA)
+            cv2.putText(img, str(round(scores[i], 3)), (bboxes[i, 0], bboxes[i, 3] + 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                        (255, 255, 255), 2, cv2.LINE_AA)
 
         scale_percent = 50  # percent of original size
         width = int(img.shape[1] * scale_percent / 100)
