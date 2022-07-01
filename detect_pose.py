@@ -23,6 +23,7 @@ pose_det = PoseDetector(static_image_mode=True, model_complexity=2, enable_segme
 detections = []
 while True:
     success, img = cap.read()
+    imgDraw = img.copy()
     # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     bboxes = yolo_det.predict(img)
     scores = bboxes[:, 4]
@@ -35,7 +36,7 @@ while True:
 
         detections.append(bboxes[i, :])
         cropped_img = yolo_det.get_bb_img(img, bboxes[i, :], expand_bb=False, margin=20)
-        poses.append(pose_det.predict(cropped_img))
+        poses.append(pose_det.predict(cropped_img, draw=False))
 
         if np.all(poses[i] != 0):
             for j in range(poses[i].shape[0]):
@@ -43,10 +44,10 @@ while True:
                 x, y = int(poses[i][j,0] + bboxes[i][0]), int(poses[i][j,1] + bboxes[i][1])
                 if poses[i][j, 2] > kps_thres:
                     cv2.circle(cropped_img, (cx, cy), 3, (255, 0, 0), cv2.FILLED)
-                    cv2.circle(img, (x, y), 3, (255, 0, 0), cv2.FILLED)
+                    cv2.circle(imgDraw, (x, y), 3, (255, 0, 0), cv2.FILLED)
                 else:
                     cv2.circle(cropped_img, (cx, cy), 3, (0, 0, 255), cv2.FILLED)
-                    cv2.circle(img, (x, y), 3, (0, 0, 255), cv2.FILLED)
+                    cv2.circle(imgDraw, (x, y), 3, (0, 0, 255), cv2.FILLED)
 
         cv2.imshow("Cropped Image", cropped_img)
         cv2.waitKey(1)
@@ -67,7 +68,7 @@ while True:
     height = int(img.shape[0] * scale_percent / 100)
     dim = (width, height)
 
-    resized = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
+    resized = cv2.resize(imgDraw, dim, interpolation=cv2.INTER_AREA)
     cv2.putText(resized, str(int(fps)), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
     cv2.imshow("Image", resized)
     cv2.waitKey(1)
