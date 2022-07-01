@@ -9,6 +9,8 @@ from utils.camera_utils import load_calibration
 from utils.twoview_geometry import fundamental_from_poses, compute_epilines, distance_point_line
 from scipy.optimize import linear_sum_assignment
 import pickle
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 

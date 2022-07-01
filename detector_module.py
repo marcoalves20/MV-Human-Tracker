@@ -3,6 +3,9 @@ import cv2
 import torch
 import numpy as np
 import time
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 
 class HumanDetector:
     def __init__(self, weights_path='yolov5x.pt', img_size=640, classes=[0], conf=0.15, iou_threshold=0.45,
@@ -36,7 +39,7 @@ class HumanDetector:
 
 def main():
     device = "cuda:0"  # or "cpu"
-    cap = cv2.VideoCapture('videos/wembley/cam01.mp4')  # make VideoCapture(0) for webcam
+    cap = cv2.VideoCapture('videos/wembley/cam02.mp4')  # make VideoCapture(0) for webcam
     pTime = 0
     detector = HumanDetector(img_size=1920)
     while True:

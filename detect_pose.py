@@ -18,8 +18,8 @@ pTime = 0
 kps_thres = 0.7
 
 yolo_det = HumanDetector(img_size=1920)
-pose_det = PoseDetector(static_image_mode=True, model_complexity=1, enable_segmentation=False,
-                        min_detection_confidence=0.4)
+pose_det = PoseDetector(static_image_mode=True, model_complexity=2, enable_segmentation=False,
+                        min_detection_confidence=0.0)
 detections = []
 while True:
     success, img = cap.read()
@@ -34,7 +34,7 @@ while True:
             break
 
         detections.append(bboxes[i, :])
-        cropped_img = yolo_det.get_bb_img(img, bboxes[i, :], expand_bb=True, margin=5)
+        cropped_img = yolo_det.get_bb_img(img, bboxes[i, :], expand_bb=False, margin=20)
         poses.append(pose_det.predict(cropped_img))
 
         if np.all(poses[i] != 0):
