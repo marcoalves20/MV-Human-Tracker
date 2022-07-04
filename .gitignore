@@ -14,3 +14,4 @@ utils/__pycache__/camera_utils.cpython-39.pyc
 utils/__pycache__/twoview_geometry.cpython-39.pyc
 videos/cam01.mp4
 images/
+checkpoints/
