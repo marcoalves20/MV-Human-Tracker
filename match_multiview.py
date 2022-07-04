@@ -230,8 +230,14 @@ def preview(img1, img2, d1, d2):
         img2=cv2.rectangle(img2, (d2[i, 0], d2[i, 1]), (d2[i, 2], d2[i, 3]), (0, 255, 0), 3)
         img2=cv2.putText(img=img2,text=str(i),org=(d2[i, 0], d2[i, 1]),fontFace=cv2.FONT_HERSHEY_DUPLEX,fontScale=3.0,color=(125, 246, 55),thickness=3)
 
-    plt.imshow(np.hstack([img1,img2]))
-    plt.show()
+    t = cv2.hconcat([img1, img2])
+    resized = cv2.resize(t, (int(2 * img1.shape[1] / 4), int(img1.shape[0] / 4)), interpolation=cv2.INTER_AREA)
+    cv2.imshow('test', resized)
+    key = cv2.waitKey(0)
+    if key:
+        cv2.destroyAllWindows()
+    # plt.imshow(np.hstack([img1,img2]))
+    # plt.show()
 
 
 def previewDetDict(img1, img2, dict1, dict2, kps_thres=0.7):
@@ -244,12 +250,12 @@ def previewDetDict(img1, img2, dict1, dict2, kps_thres=0.7):
                     color=(125, 246, 55),thickness=3)
 
         # Draw poses
-        for j in range(poses[i].shape[0]):
-            x, y = int(poses[i][j, 0] + dets[i][0]), int(poses[i][j, 1] + dets[i][1])
-            if poses[i][j, 2] > kps_thres:
-                cv2.circle(img1, (x, y), 4, (255, 0, 0), cv2.FILLED)
-            else:
-                cv2.circle(img1, (x, y), 4, (0, 255, 0), cv2.FILLED)
+        for pose in poses:
+            for kpt in pose:
+                if kpt[2] > kps_thres:
+                    cv2.circle(img1, (int(kpt[0]), int(kpt[1])), 3, (255, 0, 0), cv2.FILLED)
+                else:
+                    cv2.circle(img1, (int(kpt[0]), int(kpt[1])), 3, (0, 255, 0), cv2.FILLED)
 
     poses = dict2['poses']
     dets = dict2['detections'].astype('int')
@@ -260,52 +266,50 @@ def previewDetDict(img1, img2, dict1, dict2, kps_thres=0.7):
                            fontScale=3.0, color=(125, 246, 55), thickness=3)
 
         # Draw poses
-        for j in range(poses[i].shape[0]):
-            x, y = int(poses[i][j, 0] + dets[i][0]), int(poses[i][j, 1] + dets[i][1])
-            if poses[i][j, 2] > kps_thres:
-                cv2.circle(img2, (x, y), 4, (255, 0, 0), cv2.FILLED)
-            else:
-                cv2.circle(img2, (x, y), 4, (0, 255, 0), cv2.FILLED)
+        for pose in poses:
+            for kpt in pose:
+                if kpt[2] > kps_thres:
+                    cv2.circle(img2, (int(kpt[0]), int(kpt[1])), 3, (255, 0, 0), cv2.FILLED)
+                else:
+                    cv2.circle(img2, (int(kpt[0]), int(kpt[1])), 3, (0, 255, 0), cv2.FILLED)
 
-    plt.imshow(np.hstack([img1,img2]))
-    plt.show()
+    t = cv2.hconcat([img1, img2])
+    resized = cv2.resize(t, (int(2 * img1.shape[1]/4), int(img1.shape[0]/4 )), interpolation=cv2.INTER_AREA)
+    cv2.imshow('test', resized)
+    key = cv2.waitKey(0)
+    if key:
+        cv2.destroyAllWindows()
+    # plt.imshow(np.hstack([img1, img2]))
+    # plt.show()
 
 
 if __name__ == '__main__':
-    # d1= np.load('detections/detections_cam01.npy')
-    # d2 = np.load('detections/detections_cam02.npy')
-    # d3 = np.load('detections/detections_cam03.npy')
+
     img1 = np.load('detections/cam01_1stframe.npy')
     img2 = np.load('detections/cam02_1stframe.npy')
-    #preview(img1, img2, d1, d2)
     with open("detections/detections_dict_cam01.pkl", "rb") as f:
         dict1 = pickle.load(f)
     with open("detections/detections_dict_cam02.pkl", "rb") as f:
         dict2 = pickle.load(f)
-    d1 = dict1['detections']
-    d2 = dict2['detections']
     previewDetDict(img1.copy(), img2.copy(), dict1, dict2)
 
     views = ['cam01', 'cam02']
     calibration = load_calibration('calibration/')
 
     # Use the centre of each bbox as detection.
-    D1, D2, D3 = [], [], []
+    d1 = dict1['detections']
+    d2 = dict2['detections']
+    D1, D2 = [], []
     for i in range(len(d1)):
-        D1.append(Detection2D(position=np.array([np.mean([d1[i,0],d1[i,2]]),np.mean([d1[i,1],d1[i,3]])]), confidence=d1[i,4],view=views[0]))
+        D1.append(Detection2D(position=np.array([np.mean([d1[i, 0], d1[i, 2]]), np.mean([d1[i, 1], d1[i, 3]])]),
+                              confidence=d1[i, 4], view=views[0]))
     for i in range(len(d2)):
-        D2.append(Detection2D(position=np.array([np.mean([d2[i,0],d2[i,2]]),np.mean([d2[i,1],d2[i,3]])]), confidence=d2[i,4],view=views[1]))
-    # for i in range(len(d3)):
-    #     D3.append(Detection2D(position=np.array([np.mean([d3[i,0],d3[i,2]]),np.mean([d3[i,1],d3[i,3]])]), confidence=d3[i,4],view=views[2]))
+        D2.append(Detection2D(position=np.array([np.mean([d2[i, 0], d2[i, 2]]), np.mean([d2[i, 1], d2[i, 3]])]),
+                              confidence=d2[i, 4], view=views[1]))
     detections = {'cam01': D1, 'cam02':D2}
 
-    # Add bbox offsets to poses
     p1 = dict1['poses']
     p2 = dict2['poses']
-    for i in range(d1.shape[0]):
-        p1[i][:, :2] = p1[i][:, :2] + d1[i][:2]
-    for i in range(d2.shape[0]):
-        p2[i][:, :2] = p2[i][:, :2] + d2[i][:2]
     poses = {'cam01': p1, 'cam02': p2}
 
     matches = find_candidate_matches(detections, poses, views, calibration, max_dist=10, n_candidates=2, verbose=0)

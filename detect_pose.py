@@ -2,15 +2,14 @@ import cv2
 from detector_module import HumanDetector
 import time
 import numpy as np
-import matplotlib.pyplot as plt
 from mmpose.apis import (inference_top_down_pose_model, init_pose_model, vis_pose_result)
 import pickle
 
 
-def debug_plot(croped_img, poses):
-    plt.imshow(croped_img)
-    plt.scatter(poses[0][:,0],poses[0][:,1], s=2)
-    plt.show()
+def debug_plot(img, poses):
+    for pose in poses:
+        for kpt in pose:
+            cv2.circle(img, (int(kpt[0]), int(kpt[1])), 3, (255, 0, 0), cv2.FILLED)
 
 cap = cv2.VideoCapture('videos/wembley/cam02.mp4')
 pTime = 0
