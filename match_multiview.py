@@ -42,6 +42,57 @@ class Detection2D(Detection):
         return """{self.__class__.__name__}(view={self.view}, index={self.index}, confidence={self.confidence}, datetime={self.datetime}, position={self.position}, position_undist={self.position_undist})""".format(
             self=self)
 
+def calc_pose_similarity(poses_1, poses_2, calib_1, calib_2, frame):
+    """It calculates pose similarity in second view."""
+
+    proj1 = calib_1['K'] @ np.concatenate((calib_1['R'], calib_1['t'].reshape(3, 1)), 1)
+    proj2 = calib_2['K'] @ np.concatenate((calib_2['R'], calib_2['t'].reshape(3, 1)), 1)
+
+    similarity_poses = np.zeros((len(poses_2), len(poses_1)))
+
+    for p1_id, p1 in enumerate(poses_1):
+        pose1 = p1[:, :2]
+
+        for p2_id, p2 in enumerate(poses_2):
+            pose2 = p2[:, :2]
+
+            # if count == 1:
+            #     for pt in pose2:
+            #         kp = (int(pt[0]), int(pt[1]))
+            #         cv2.circle(frame, kp, 2, (255, 0, 0), 2)
+            #     resized = cv2.resize(frame, (int(frame.shape[1] / 2), int(frame.shape[0] / 2)), interpolation=cv2.INTER_AREA)
+            #     cv2.imshow('test', resized)
+            #     cv2.waitKey(0)
+            #     count = 0
+
+            points3D = np.zeros((len(pose1), 3))
+            points4D = cv2.triangulatePoints(proj1, proj2, pose1.T, pose2.T)
+
+            points3D[:, 0] = points4D[0, :] / points4D[3, :]
+            points3D[:, 1] = points4D[1, :] / points4D[3, :]
+            points3D[:, 2] = points4D[2, :] / points4D[3, :]
+
+            rvec, jac = cv2.Rodrigues(calib_2['R'])
+            kps_proj, jac = cv2.projectPoints(points3D, rvec, calib_2['t'], calib_2['K'], None)
+            kps_proj = np.squeeze(kps_proj)
+
+            # for pt in kps_proj:
+            #     kp = (int(pt[0]), int(pt[1]))
+            #     cv2.circle(frame, kp, 2, (0, 0, 255), 2)
+            # # Plot image
+            # resized = cv2.resize(frame, (int(frame.shape[1] / 2), int(frame.shape[0] / 2)), interpolation=cv2.INTER_AREA)
+            # cv2.imshow('test', resized)
+            # cv2.waitKey(0)
+
+            cov1 = np.cov(pose2)
+            cov2 = np.cov(kps_proj)
+            cosine_similarity = np.sum(cov1 * cov2, axis=1) / (np.linalg.norm(cov1, axis=1) * np.linalg.norm(cov2, axis=1))
+
+            similarity_poses[p2_id, p1_id] = np.median(cosine_similarity)
+
+    ss = np.argmax(similarity_poses, 1)
+    return similarity_poses
+
 
 def calc_cost_poses(poses_1, poses_2, F, kps_thres=0.8):
 
@@ -311,6 +362,8 @@ if __name__ == '__main__':
     p1 = dict1['poses']
     p2 = dict2['poses']
     poses = {'cam01': p1, 'cam02': p2}
+
+    calc_pose_similarity(p1, p2, calibration['cam01'], calibration['cam02'], img2.copy())
 
     matches = find_candidate_matches(detections, poses, views, calibration, max_dist=10, n_candidates=2, verbose=0)
     sorted_idx = filter_matching(views, matches)
