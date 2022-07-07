@@ -56,14 +56,12 @@ def calc_pose_similarity(poses_1, poses_2, calib_1, calib_2, frame):
         for p2_id, p2 in enumerate(poses_2):
             pose2 = p2[:, :2]
 
-            # if count == 1:
-            #     for pt in pose2:
-            #         kp = (int(pt[0]), int(pt[1]))
-            #         cv2.circle(frame, kp, 2, (255, 0, 0), 2)
-            #     resized = cv2.resize(frame, (int(frame.shape[1] / 2), int(frame.shape[0] / 2)), interpolation=cv2.INTER_AREA)
-            #     cv2.imshow('test', resized)
-            #     cv2.waitKey(0)
-            #     count = 0
+            # for pt in pose2:
+            #     kp = (int(pt[0]), int(pt[1]))
+            #     cv2.circle(frame, kp, 2, (255, 0, 0), 2)
+            # resized = cv2.resize(frame, (int(frame.shape[1] / 2), int(frame.shape[0] / 2)), interpolation=cv2.INTER_AREA)
+            # cv2.imshow('test', resized)
+            # cv2.waitKey(0)
 
             points3D = np.zeros((len(pose1), 3))
             points4D = cv2.triangulatePoints(proj1, proj2, pose1.T, pose2.T)
@@ -90,7 +88,7 @@ def calc_pose_similarity(poses_1, poses_2, calib_1, calib_2, frame):
 
             similarity_poses[p2_id, p1_id] = np.median(cosine_similarity)
 
-    ss = np.argmax(similarity_poses, 1)
+    #ss = np.argmax(similarity_poses, 1)
     return similarity_poses
 
 
@@ -338,10 +336,13 @@ if __name__ == '__main__':
 
     img1 = np.load('detections/cam01_1stframe.npy')
     img2 = np.load('detections/cam02_1stframe.npy')
+    img3 = np.load('detections/cam03_1stframe.npy')
     with open("detections/detections_dict_cam01.pkl", "rb") as f:
         dict1 = pickle.load(f)
     with open("detections/detections_dict_cam02.pkl", "rb") as f:
         dict2 = pickle.load(f)
+    with open("detections/detections_dict_cam03.pkl", "rb") as f:
+        dict3 = pickle.load(f)
     previewDetDict(img1.copy(), img2.copy(), dict1, dict2)
 
     views = ['cam01', 'cam02']
@@ -363,7 +364,8 @@ if __name__ == '__main__':
     p2 = dict2['poses']
     poses = {'cam01': p1, 'cam02': p2}
 
-    calc_pose_similarity(p1, p2, calibration['cam01'], calibration['cam02'], img2.copy())
+    similarity_poses = calc_pose_similarity(p1, p2, calibration['cam01'], calibration['cam02'], img2.copy())
+    calc_color_histograms(d2, img2)
 
     matches = find_candidate_matches(detections, poses, views, calibration, max_dist=10, n_candidates=2, verbose=0)
     sorted_idx = filter_matching(views, matches)
