@@ -42,6 +42,7 @@ class Detection2D(Detection):
         return """{self.__class__.__name__}(view={self.view}, index={self.index}, confidence={self.confidence}, datetime={self.datetime}, position={self.position}, position_undist={self.position_undist})""".format(
             self=self)
 
+
 def calc_pose_similarity(poses_1, poses_2, calib_1, calib_2, frame):
     """It calculates pose similarity in second view."""
 
@@ -134,8 +135,8 @@ def calc_cost_detections(dets1, dets2, F, view1, view2, max_dist=10, n_candidate
         idxs_candidates = []
         sel_distances = []
         for idx in idx_sorted:
-            # exit this loop if the distance start to be
-            # o high or the number candidates is reached
+            # exit this loop if the distance starts to be
+            # too high or the number candidates is reached
             if verbose == 2:
                 print("{}-{} {}-{} {:0.2f}".format(view1, i1, view2, idx, distances[idx]))
             if distances[idx] > max_dist:
@@ -180,15 +181,9 @@ def find_candidate_matches(detections, poses, views, calibration, max_dist=10, n
     n_candidates : int
         max number of candidates per detection in each view
     """
-
-    # for view, ds in detections.items():
-    #     K = np.array(calibration[view]['K'])
-    #     dist = np.array(calibration[view]['dist'])
-        # for d in ds:
-        #     d.position_undist = cv2.undistortPoints(np.reshape(d.position, (1, 2)), K, dist, P=K)[0].squeeze()
-
     sel_indexes = {}
     dist_array = {}
+    all_cost_poses = []
     for view1 in views:
 
         sel_indexes[view1] = {}
@@ -228,42 +223,70 @@ def find_candidate_matches(detections, poses, views, calibration, max_dist=10, n
                 cost, sel_ids = calc_cost_detections(positions_undist1, positions_undist2, F,
                                                                         view1, view2, max_dist, n_candidates, verbose)
                 sel_indexes[view1][view2] = sel_ids
-                row_ind, col_ind = linear_sum_assignment(cost)
+                #row_ind, col_ind = linear_sum_assignment(cost)
                 dist_array[view1][view2] = cost
 
                 # Calculate pose cost
                 poses_2 = poses[view2]
                 cost_poses = calc_cost_poses(poses_1, poses_2, F, kps_thres=0.8)
+                all_cost_poses.append(cost_poses)
 
-    return sel_indexes
+    return sel_indexes, all_cost_poses[0]
 
 
-def filter_matching(views, matches):
+def filter_matching(matches, cost_poses):
+
+    views = [k for k in matches.keys()]
     indexes = []
-    for i, id in enumerate(matches['cam01']['cam02']):
+    tmp_list = list(matches[views[0]].values())
+    for i, id in enumerate(tmp_list[0]):
         try:
-            indexes.append([i,id[0][0]])
+            if id[0] != []:
+                indexes.append([i, id[0]])
         except:
             pass
 
     indexes = np.array(indexes)
 
+    # Remove duplicate values by checking the cost_poses
+    sel_ids = np.array([i[0] for i in indexes[:, 1]])
+    dump_val = 10000
+    while len(sel_ids) != len(set(sel_ids)): # Repeat as long as sel_ids contains duplicate values
+        for i in range(len(indexes)):
+            dup_ids = np.where(sel_ids == sel_ids[i])[0]
+            if len(dup_ids) > 1:
+                ids_view1 = indexes[dup_ids, 0]
+                costs = cost_poses[list(ids_view1), sel_ids[i]]
+                sorted_ids = np.argsort(costs)
+
+                for j in range(1, len(sorted_ids)):
+                    tmp_id = dup_ids[sorted_ids[j]]
+                    indexes[tmp_id, :][1] = indexes[tmp_id, :][1][1:] # remove first element
+                    if len(indexes[tmp_id, :][1]) != 0:
+                        sel_ids[tmp_id] = indexes[tmp_id, :][1][0]
+                    else:
+                        sel_ids[tmp_id] = dump_val
+                        dump_val += 1
+
+    indexes[:, 1] = sel_ids
+    lst = list(np.where(indexes >= 10000))
+    indexes = np.delete(indexes, lst[0], axis=0)
+
     # Remove duplicate values
-    for i in range(indexes.shape[0]):
-        id1 = indexes[i, 1]
-        for j in range(indexes.shape[0]):
-            # Case we have duplicate values
-            if i!=j and indexes[j, 1] == id1:
-
-                if matches['cam01']['cam02'][indexes[i, 0]][1][0] < matches['cam01']['cam02'][indexes[j, 0]][1][0] and len(matches['cam01']['cam02'][indexes[j, 0]][0]) > 1:
-                    matches['cam01']['cam02'][indexes[j, 0]][1].pop(0)
-                    matches['cam01']['cam02'][indexes[j, 0]][0].pop(0)
-                    indexes[j, 1] = matches['cam01']['cam02'][indexes[j, 0]][0][0]
-                elif matches['cam01']['cam02'][indexes[i, 0]][1][0] > matches['cam01']['cam02'][indexes[j, 0]][1][0] and len(matches['cam01']['cam02'][indexes[i, 0]][0]) > 1:
-                    matches['cam01']['cam02'][indexes[i, 0]][1].pop(0)
-                    matches['cam01']['cam02'][indexes[i, 0]][0].pop(0)
-                    indexes[i, 1] = matches['cam01']['cam02'][indexes[i, 0]][0][0]
-
+    # for i in range(indexes.shape[0]):
+    #     id1 = indexes[i, 1]
+    #     for j in range(indexes.shape[0]):
+    #         # Case we have duplicate values
+    #         if i!=j and indexes[j, 1] == id1:
+    #
+    #             if matches['cam01']['cam02'][indexes[i, 0]][1][0] < matches['cam01']['cam02'][indexes[j, 0]][1][0] and len(matches['cam01']['cam02'][indexes[j, 0]][0]) > 1:
+    #                 matches['cam01']['cam02'][indexes[j, 0]][1].pop(0)
+    #                 matches['cam01']['cam02'][indexes[j, 0]][0].pop(0)
+    #                 indexes[j, 1] = matches['cam01']['cam02'][indexes[j, 0]][0][0]
+    #             elif matches['cam01']['cam02'][indexes[i, 0]][1][0] > matches['cam01']['cam02'][indexes[j, 0]][1][0] and len(matches['cam01']['cam02'][indexes[i, 0]][0]) > 1:
+    #                 matches['cam01']['cam02'][indexes[i, 0]][1].pop(0)
+    #                 matches['cam01']['cam02'][indexes[i, 0]][0].pop(0)
+    #                 indexes[i, 1] = matches['cam01']['cam02'][indexes[i, 0]][0][0]
 
     return indexes
 
@@ -336,13 +359,13 @@ if __name__ == '__main__':
 
     img1 = np.load('detections/cam01_1stframe.npy')
     img2 = np.load('detections/cam02_1stframe.npy')
-    img3 = np.load('detections/cam03_1stframe.npy')
+    #img3 = np.load('detections/cam03_1stframe.npy')
     with open("detections/detections_dict_cam01.pkl", "rb") as f:
         dict1 = pickle.load(f)
     with open("detections/detections_dict_cam02.pkl", "rb") as f:
         dict2 = pickle.load(f)
-    with open("detections/detections_dict_cam03.pkl", "rb") as f:
-        dict3 = pickle.load(f)
+    # with open("detections/detections_dict_cam03.pkl", "rb") as f:
+    #     dict3 = pickle.load(f)
     previewDetDict(img1.copy(), img2.copy(), dict1, dict2)
 
     views = ['cam01', 'cam02']
@@ -365,13 +388,12 @@ if __name__ == '__main__':
     poses = {'cam01': p1, 'cam02': p2}
 
     similarity_poses = calc_pose_similarity(p1, p2, calibration['cam01'], calibration['cam02'], img2.copy())
-    calc_color_histograms(d2, img2)
 
-    matches = find_candidate_matches(detections, poses, views, calibration, max_dist=10, n_candidates=2, verbose=0)
-    sorted_idx = filter_matching(views, matches)
+    matches, cost_poses = find_candidate_matches(detections, poses, views, calibration, max_dist=15, n_candidates=4, verbose=0)
+    sorted_idx = filter_matching(matches, cost_poses)
 
-    new_d1 = d1[sorted_idx[:, 0], :]
-    new_d2 = d2[sorted_idx[:, 1], :]
+    new_d1 = d1[list(sorted_idx[:, 0]), :]
+    new_d2 = d2[list(sorted_idx[:, 1]), :]
     preview(img1, img2, new_d1, new_d2)
 
     print(1)
