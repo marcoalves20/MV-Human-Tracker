@@ -1,47 +1,89 @@
 import numpy as np
+import random
 
 
-class Tracklet:
-    def __init__(self, pos, track_id):
-        self.id = track_id
-        self.last_pos = pos
-        self.pos_list = [pos]
-        self.pos_num = 0
-        self.last_frame = pos.t
-        self.vel = [0,0]
+class TrackState:
+    """
+    Enumeration type for the single target track state. Newly created tracks are
+    classified as `tentative` until enough evidence has been collected. Then,
+    the track state is changed to `confirmed`. Tracks that are no longer alive
+    are classified as `deleted` to mark them for removal from the set of active
+    tracks.
+    """
+
+    Tentative = 1
+    Confirmed = 2
+    Deleted = 3
+
+# TODO: Add tentative state. Currently only Confirmed and Deleted trackstate is used.
+
+class Track:
+    """ A single target track.
+
+     Attributes
+    ----------
+    track_id : int
+        A unique track identifier.
+    bbox_list : list[bboxes]
+        A list containing the position of the track in the form of bboxes (in tlbr form).
+    age : int
+        Total number of frames since first occurance.
+    time_since_update : int
+        Total number of frames since last measurement update.
+    max_age : int
+        The maximum number of consecutive misses before the track state is
+        set to `Deleted`.
+    state : TrackState
+        The current track state.
+    """
+
+    def __init__(self, track_id, bbox, max_age):
+        self.track_id = track_id
+        self.bbox_list = [bbox]
+        self.age = 1
+        self.time_since_update = 0
+        self._max_age = max_age
+        self.state = TrackState.Confirmed
+
+        r = random.randint(0, 255)
+        g = random.randint(0, 255)
+        b = random.randint(0, 255)
+        self.color = [b, g, r]
 
 
-    def add_pos(self, pos):
-        self.pos_list.append(pos)
-        self.pos_num += 1
-        self.last_pos = pos
-        self.last_frame = pos.t
-        self.update_vel()
+    def to_mean_pos(self):
+        """ Get current position as the middle of bbox."""
+        ret = np.array([np.mean([self.bbox_list[-1][0], self.bbox_list[-1][2]]),
+                        np.mean([self.bbox_list[-1][1], self.bbox_list[-1][3]])])
+        return ret
 
-    def set_id(self, new_id):
-        self.id = new_id
 
-    def update_vel(self):
-        if (self.pos_num < 2):
-            return
-        elif (self.pos_num < 6):
-            vx = (self.pos_list[self.pos_num - 1].x - self.pos_list[self.pos_num - 2].x) / (
-                        self.pos_list[self.pos_num - 1].t - self.pos_list[self.pos_num - 2].t)
-            vy = (self.pos_list[self.pos_num - 1].z - self.pos_list[self.pos_num - 2].z) / (
-                        self.pos_list[self.pos_num - 1].t - self.pos_list[self.pos_num - 2].t)
-            self.v = [vx, vy]
-        else:
-            vx1 = (self.pos_list[self.pos_num - 1].x - self.pos_list[self.pos_num - 4].x) / (
-                        self.pos_list[self.pos_num - 1].t - self.pos_list[self.pos_num - 4].t)
-            vy1 = (self.pos_list[self.pos_num - 1].z - self.pos_list[self.pos_num - 4].z) / (
-                        self.pos_list[self.pos_num - 1].t - self.pos_list[self.pos_num - 4].t)
-            vx2 = (self.pos_list[self.pos_num - 2].x - self.pos_list[self.pos_num - 5].x) / (
-                        self.pos_list[self.pos_num - 2].t - self.pos_list[self.pos_num - 5].t)
-            vy2 = (self.pos_list[self.pos_num - 2].z - self.pos_list[self.pos_num - 5].z) / (
-                        self.pos_list[self.pos_num - 2].t - self.pos_list[self.pos_num - 5].t)
-            vx3 = (self.pos_list[self.pos_num - 3].x - self.pos_list[self.pos_num - 6].x) / (
-                        self.pos_list[self.pos_num - 3].t - self.pos_list[self.pos_num - 6].t)
-            vy3 = (self.pos_list[self.pos_num - 3].z - self.pos_list[self.pos_num - 6].z) / (
-                        self.pos_list[self.pos_num - 3].t - self.pos_list[self.pos_num - 6].t)
-            vx, vy = (vx1 + vx2 + vx3) / 3, (vy1 + vy2 + vy3) / 3
-            self.v = [vx, vy]
+    def to_tlwh(self):
+        """ Get current position in bounding box format `(top left x, top left y, width, height)`. """
+        w = self.bbox_list[-1][2] - self.bbox_list[-1][0]
+        h = self.bbox_list[-1][3] - self.bbox_list[-1][1]
+        ret = np.array([self.bbox_list[-1][0], self.bbox_list[-1][1], w, h])
+        return ret
+
+
+    def update(self, bbox):
+        self.bbox_list.append(bbox)
+        self.age += 1
+        self.time_since_update = 0
+
+
+    def mark_missed(self):
+        """ Mark this track as missed (no association at the current time step)."""
+        self.time_since_update += 1
+        if self.time_since_update > self._max_age:
+            self.state = TrackState.Deleted
+
+
+    def is_confirmed(self):
+        """Returns True if this track is confirmed."""
+        return self.state == TrackState.Confirmed
+
+
+    def is_deleted(self):
+        """Returns True if this track is dead and should be deleted."""
+        return self.state == TrackState.Deleted
