@@ -1,13 +1,8 @@
-import os
-import sys
-import time
 import numpy as np
-import itertools
 import cv2
-import time
 from utils.camera_utils import load_calibration
-from utils.twoview_geometry import fundamental_from_poses, compute_epilines, distance_point_line
-from scipy.optimize import linear_sum_assignment
+from utils.twoview_geometry import fundamental_from_poses
+from metrics import pose_similarity, pose_cost, detections_cost
 import pickle
 import matplotlib
 matplotlib.use('TkAgg')
@@ -41,127 +36,6 @@ class Detection2D(Detection):
     def __str__(self):
         return """{self.__class__.__name__}(view={self.view}, index={self.index}, confidence={self.confidence}, datetime={self.datetime}, position={self.position}, position_undist={self.position_undist})""".format(
             self=self)
-
-
-def calc_pose_similarity(poses_1, poses_2, calib_1, calib_2, frame):
-    """It calculates pose similarity in second view."""
-
-    proj1 = calib_1['K'] @ np.concatenate((calib_1['R'], calib_1['t'].reshape(3, 1)), 1)
-    proj2 = calib_2['K'] @ np.concatenate((calib_2['R'], calib_2['t'].reshape(3, 1)), 1)
-
-    similarity_poses = np.zeros((len(poses_2), len(poses_1)))
-
-    for p1_id, p1 in enumerate(poses_1):
-        pose1 = p1[:, :2]
-
-        for p2_id, p2 in enumerate(poses_2):
-            pose2 = p2[:, :2]
-
-            # for pt in pose2:
-            #     kp = (int(pt[0]), int(pt[1]))
-            #     cv2.circle(frame, kp, 2, (255, 0, 0), 2)
-            # resized = cv2.resize(frame, (int(frame.shape[1] / 2), int(frame.shape[0] / 2)), interpolation=cv2.INTER_AREA)
-            # cv2.imshow('test', resized)
-            # cv2.waitKey(0)
-
-            points3D = np.zeros((len(pose1), 3))
-            points4D = cv2.triangulatePoints(proj1, proj2, pose1.T, pose2.T)
-
-            points3D[:, 0] = points4D[0, :] / points4D[3, :]
-            points3D[:, 1] = points4D[1, :] / points4D[3, :]
-            points3D[:, 2] = points4D[2, :] / points4D[3, :]
-
-            rvec, jac = cv2.Rodrigues(calib_2['R'])
-            kps_proj, jac = cv2.projectPoints(points3D, rvec, calib_2['t'], calib_2['K'], None)
-            kps_proj = np.squeeze(kps_proj)
-
-            # for pt in kps_proj:
-            #     kp = (int(pt[0]), int(pt[1]))
-            #     cv2.circle(frame, kp, 2, (0, 0, 255), 2)
-            # # Plot image
-            # resized = cv2.resize(frame, (int(frame.shape[1] / 2), int(frame.shape[0] / 2)), interpolation=cv2.INTER_AREA)
-            # cv2.imshow('test', resized)
-            # cv2.waitKey(0)
-
-            cov1 = np.cov(pose2)
-            cov2 = np.cov(kps_proj)
-            cosine_similarity = np.sum(cov1 * cov2, axis=1) / (np.linalg.norm(cov1, axis=1) * np.linalg.norm(cov2, axis=1))
-
-            similarity_poses[p2_id, p1_id] = np.median(cosine_similarity)
-
-    #ss = np.argmax(similarity_poses, 1)
-    return similarity_poses
-
-
-def calc_cost_poses(poses_1, poses_2, F, kps_thres=0.8):
-
-    cost_poses = np.zeros((len(poses_1), len(poses_2)))
-
-    for i, pose1 in enumerate(poses_1):
-        if np.all(pose1 == 0):
-            cost_poses[i, :] = np.nan
-            continue
-
-        _, lines = compute_epilines(pose1[:, :2], None, F)  # 33 lines (equal to the number of keypoints)
-
-        # calculate distance from epipolar lines for each pose in second view
-        for id, pose2 in enumerate(poses_2):
-            distances = []
-            for pt_id in range(pose2.shape[0]):
-                if pose2[pt_id, 2] > kps_thres and pose1[pt_id, 2] > kps_thres:
-                    distances.append(distance_point_line(pose2[pt_id, :2], lines[pt_id, :]))
-
-            if len(distances) != 0:
-                cost_poses[i, id] = np.nanmedian(distances)
-            else:
-                cost_poses[i, id] = np.nan
-
-    return cost_poses
-
-
-def calc_cost_detections(dets1, dets2, F, view1, view2, max_dist=10, n_candidates=2, verbose=0):
-    """ It calculates the cost matrix based on bbox detections and returns candidate matches based on this."""
-
-    cost = np.zeros((len(dets1), len(dets2)))
-    sel_ids = []
-
-    _, lines = compute_epilines(dets1, None, F)
-
-    for i1, line in enumerate(lines):
-
-        distances = [distance_point_line(x, line) for x in dets2]
-        cost[i1, :] = distances
-        idx_sorted = np.argsort(distances)
-        idxs_candidates = []
-        sel_distances = []
-        for idx in idx_sorted:
-            # exit this loop if the distance starts to be
-            # too high or the number candidates is reached
-            if verbose == 2:
-                print("{}-{} {}-{} {:0.2f}".format(view1, i1, view2, idx, distances[idx]))
-            if distances[idx] > max_dist:
-                if verbose == 2:
-                    print("{}-{} {}-{} discarded because of distance {:0.2f}".format(view1, i1, view2, idx,
-                                                                                     distances[idx]))
-                else:
-                    break
-            elif len(idxs_candidates) >= n_candidates:
-                if verbose == 2:
-                    print("{}-{} {}-{} discarded because of number of candidates reached.".format(view1, i1,
-                                                                                                  view2,
-                                                                                                  idx))
-                else:
-                    break
-            else:
-                if verbose == 2:
-                    print("{}-{} {}-{} selected distance {:0.2f}".format(view1, i1, view2, idx,
-                                                                         distances[idx]))
-                idxs_candidates.append(idx)
-                sel_distances.append(distances[idx])
-
-        sel_ids.append((idxs_candidates, sel_distances))
-
-    return cost, sel_ids
 
 
 def find_candidate_matches(detections, poses, views, calibration, max_dist=10, n_candidates=2, verbose=0):
@@ -220,15 +94,15 @@ def find_candidate_matches(detections, poses, views, calibration, max_dist=10, n
                 # Calculate detection cost
                 positions_undist2 = np.reshape([detection.position
                                                 for detection in detections[view2]], (-1, 2))
-                cost, sel_ids = calc_cost_detections(positions_undist1, positions_undist2, F,
-                                                                        view1, view2, max_dist, n_candidates, verbose)
+                cost, sel_ids = detections_cost(positions_undist1, positions_undist2, F,
+                                                                        view1, view2, max_dist, n_candidates)
                 sel_indexes[view1][view2] = sel_ids
                 #row_ind, col_ind = linear_sum_assignment(cost)
                 dist_array[view1][view2] = cost
 
                 # Calculate pose cost
                 poses_2 = poses[view2]
-                cost_poses = calc_cost_poses(poses_1, poses_2, F, kps_thres=0.8)
+                cost_poses = pose_cost(poses_1, poses_2, F, kps_thres=0.8)
                 all_cost_poses.append(cost_poses)
 
     return sel_indexes, all_cost_poses[0]
@@ -246,7 +120,7 @@ def filter_matching(matches, cost_poses):
         except:
             pass
 
-    indexes = np.array(indexes)
+    indexes = np.array(indexes, dtype=object)
 
     # Remove duplicate values by checking the cost_poses
     sel_ids = np.array([i[0] for i in indexes[:, 1]])
@@ -387,7 +261,7 @@ if __name__ == '__main__':
     p2 = dict2['poses']
     poses = {'cam01': p1, 'cam02': p2}
 
-    similarity_poses = calc_pose_similarity(p1, p2, calibration['cam01'], calibration['cam02'], img2.copy())
+    similarity_poses = pose_similarity(p1, p2, calibration['cam01'], calibration['cam02'], img2.copy())
 
     matches, cost_poses = find_candidate_matches(detections, poses, views, calibration, max_dist=15, n_candidates=4, verbose=0)
     sorted_idx = filter_matching(matches, cost_poses)

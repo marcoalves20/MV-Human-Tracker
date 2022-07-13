@@ -6,64 +6,7 @@ from pathlib import Path
 from utils.camera_utils import load_calibration
 from tracks import Track
 from scipy.optimize import linear_sum_assignment as linear_assignment
-from match_multiview import Detection2D
-
-INFTY_COST = 1e+5
-
-
-def iou(bbox, candidates):
-    """
-    Calculate the Intersection over Union (IoU) between the bbox and each candidate.
-
-    Parameters
-    -----------
-    bbox: ndarray
-        A bounding box in the format (top left x, top left y, top right x, top right y)
-    candidates: ndarray
-        A matrix of candidate bounding boxes (one per row) in the same format as `bbox`.
-    """
-    bbox_tl, bbox_br = bbox[:2], bbox[2:]
-    candidates_tl = candidates[:, :2]
-    candidates_br = candidates[:, 2:]
-
-    # determine the coordinates of the intersection rectangles
-    tl = np.c_[np.maximum(bbox_tl[0], candidates_tl[:, 0])[:, np.newaxis],
-               np.maximum(bbox_tl[1], candidates_tl[:, 1])[:, np.newaxis]]
-    br = np.c_[np.minimum(bbox_br[0], candidates_br[:, 0])[:, np.newaxis],
-               np.minimum(bbox_br[1], candidates_br[:, 1])[:, np.newaxis]]
-    wh = np.maximum(0., br - tl)
-
-    area_intersection = wh.prod(axis=1)
-    area_bbox = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-    area_candidates = (candidates[:, 2] - candidates[:, 0]) * (candidates[:, 3] - candidates[:, 1])
-
-    return area_intersection / (area_bbox + area_candidates - area_intersection)
-
-
-def iou_cost(tracks, detections):
-    """An intersection over union distance metric.
-
-        Parameters
-        ----------
-        tracks : List[Tracks]
-            A list of tracks.
-        detections : List[bboxes]
-            A list of detections.
-    """
-    track_indices = np.arange(len(tracks))
-    detection_indices = np.arange(len(detections))
-
-    cost_matrix = np.zeros((len(tracks), len(detections)))
-    for row, track_idx in enumerate(track_indices):
-        if tracks[track_idx].time_since_update > 1:
-            cost_matrix[row, :] = INFTY_COST
-            continue
-
-        bbox = tracks[track_idx].bbox_list[-1]
-        candidates = np.asarray([detections[i] for i in detection_indices])
-        cost_matrix[row, :] = 1. - iou(bbox, candidates)
-
-    return cost_matrix
+from metrics import iou_cost
 
 
 def min_cost_matching(tracks, detections, max_distance):
@@ -78,7 +21,7 @@ def min_cost_matching(tracks, detections, max_distance):
         * A list of unmatched detection indices.
     """
     cost_matrix = iou_cost(tracks, detections)
-    #cost_matrix[cost_matrix > max_distance] = max_distance + 1e+5
+    #cost_matrix[cost_matrix > max_distance] = max_distance + 1e-5
     indices = linear_assignment(cost_matrix)
     indices = np.array(indices).T
 
@@ -228,8 +171,6 @@ def main():
         videoWriter.release()
 
     print(f'Tracking completed!')
-
-
 
 
 
