@@ -72,7 +72,7 @@ class Tracker:
         The track id to be used in the next new track.
     """
 
-    def __init__(self,  min_iou = 0.8, max_age=10):
+    def __init__(self,  min_iou = 0.5, max_age=30):
         self.min_iou = min_iou
         self.max_age = max_age
         self.tracks = []
@@ -106,7 +106,8 @@ class Tracker:
 
 
     def _match(self, detections):
-        matches, unmatched_tracks, unmatched_detections = min_cost_matching(self.tracks, detections, max_distance=0.4)
+        matches, unmatched_tracks, unmatched_detections = min_cost_matching(self.tracks, detections,
+                                                                            max_distance=1-self.min_iou)
 
         return matches, unmatched_tracks, unmatched_detections
 

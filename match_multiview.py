@@ -38,7 +38,7 @@ class Detection2D(Detection):
             self=self)
 
 
-def find_candidate_matches(detections, poses, views, calibration, max_dist=10, n_candidates=2, verbose=0):
+def find_candidate_matches(detections, poses, views, calibration, max_dist=10, n_candidates=2):
     """
     Given a detection in one view, find the best candidates detections on the other views
 
@@ -95,7 +95,7 @@ def find_candidate_matches(detections, poses, views, calibration, max_dist=10, n
                 positions_undist2 = np.reshape([detection.position
                                                 for detection in detections[view2]], (-1, 2))
                 cost, sel_ids = detections_cost(positions_undist1, positions_undist2, F,
-                                                                        view1, view2, max_dist, n_candidates)
+                                                                     max_dist, n_candidates)
                 sel_indexes[view1][view2] = sel_ids
                 #row_ind, col_ind = linear_sum_assignment(cost)
                 dist_array[view1][view2] = cost
@@ -263,7 +263,7 @@ if __name__ == '__main__':
 
     similarity_poses = pose_similarity(p1, p2, calibration['cam01'], calibration['cam02'], img2.copy())
 
-    matches, cost_poses = find_candidate_matches(detections, poses, views, calibration, max_dist=15, n_candidates=4, verbose=0)
+    matches, cost_poses = find_candidate_matches(detections, poses, views, calibration, max_dist=15, n_candidates=4)
     sorted_idx = filter_matching(matches, cost_poses)
 
     new_d1 = d1[list(sorted_idx[:, 0]), :]

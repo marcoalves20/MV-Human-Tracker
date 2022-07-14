@@ -81,7 +81,7 @@ def pose_cost(poses_1, poses_2, F, kps_thres=0.8):
     return cost_poses
 
 
-def detections_cost(dets1, dets2, F, view1, view2, max_dist=10, n_candidates=2):
+def detections_cost(dets1, dets2, F, max_dist=10, n_candidates=2):
     """ It calculates the cost matrix based on bbox detections and returns candidate matches based on this."""
 
     cost = np.zeros((len(dets1), len(dets2)))
