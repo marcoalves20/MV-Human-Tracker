@@ -1,4 +1,4 @@
-# Tracking
+# MV-Human-Tracker
 
 **Tracking** is a Python-based framework designed for multi-view, multi-person tracking and pose estimation. It integrates 2D detections, pose estimation, and multi-view association to reconstruct and track human poses across multiple camera views.
 
